@@ -6,6 +6,8 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
 from kivy.uix.floatlayout import FloatLayout
+from kivy.clock import Clock
+from time import *
 from read_records import to_read_records
 from script_game2 import *
 
@@ -161,11 +163,13 @@ class MenuScreen(Screen):
 
         error_text = to_control_limits(entered_min_limit, entered_max_limit)
 
+        app = App.get_running_app()
+        app.start_time = time()
+
         if error_text == '':
-            app = App.get_running_app()
             app.min_limit = int(entered_min_limit)
             app.max_limit = int(entered_max_limit)
-            print(f"Сохранено: {entered_min_limit}-{entered_max_limit}")
+            app.hidden_number = to_create_number(app.min_limit, app.max_limit)
 
             self.popup.dismiss()
             self.to_show_game()
@@ -176,7 +180,7 @@ class MenuScreen(Screen):
     def to_show_game(self, instance = None):
         self.manager.current = 'game'
     
-    def to_show_records(self):
+    def to_show_records(self, instance):
         self.manager.current = 'records'
 
     def to_confirm_exit(self, instance):
@@ -229,7 +233,6 @@ class GameScreen(Screen):
         super().__init__(**kwargs)
 
         main_game_menu_layout = FloatLayout()
-        
         self.range_label = Label(
             text = '',
             font_size='20sp',
@@ -240,14 +243,14 @@ class GameScreen(Screen):
         )
 
         self.text_number_input = TextInput(
-            hint_text='Введите число',
-            size_hint=(0.5, None),
-            height=50,
-            pos_hint={'center_x': 0.5, 'center_y': 0.65},
-            input_filter='int',
+            hint_text = 'Введите число',
+            size_hint = (0.5, None),
+            height = 50,
+            pos_hint = {'center_x': 0.5, 'center_y': 0.65},
+            input_filter = 'int',
             multiline = False,
             allow_copy = False,
-            write_tab=False
+            write_tab = False
         )
         
         btn_confirm_input = Button(
@@ -277,20 +280,54 @@ class GameScreen(Screen):
 
     def on_enter(self):
         app = App.get_running_app()
+
         if hasattr(app, 'min_limit') and hasattr(app, 'max_limit'):
             self.range_label.text = f'Диапазон значений от {app.min_limit} до {app.max_limit}'
             self.text_number_input.hint_text = f'Введите число от {app.min_limit} до {app.max_limit}'
 
-    # def to_save_number(self, instance):
-    #     app = App.get_running_app()
-    #     entered_number = self.text_number_input.text.strip()
+        self.text_number_input.text = ""
 
-    #     original_text = f'Диапазон значений от {app.min_limit} до {app.max_limit}'
+    def to_save_records(self):
+        app = App.get_running_app()
+        app.end_time = time()
+        app.result_time = keep_track_of_time(app.start_time, app.end_time)
+        to_write_records(app.result_time, filename='records.txt')
 
-    #     error_text = to_contol_user_number(app.min_limit, app.max_limit, entered_number)
+    def close_popup_and_clear(self, instance):
+        self.text_number_input.text = ""
+        self.win_popup.dismiss()
+        self.to_save_records()
+        self.go_back_to_menu(instance)
+
+    def to_confirm_the_win(self):
+        win_layout = BoxLayout(
+            orientation='vertical',
+            spacing=10,
+            padding=20)
         
-    #     self.text_number_input.text = ""
-    #     return entered_number
+        win_message = Label(
+            text = 'Поздравляю! Вы угадали число!',
+            font_size='18sp'
+        )
+
+        btn_ok = Button(
+            text='ОК',
+            background_color=(0.2, 0.6, 0.2, 1),
+            size_hint=(0.4, 0.15),
+            pos_hint={'center_x': 0.5, 'y': 0.1}
+            )
+        btn_ok.bind(on_press=self.close_popup_and_clear)
+
+        self.win_popup = Popup(
+            title = 'Победа',
+            content = win_layout,
+            size_hint=(0.45, 0.45)
+        )
+        self.win_popup.open()
+
+
+        win_layout.add_widget(win_message)
+        win_layout.add_widget(btn_ok)
 
     def to_save_number(self, instance):
         app = App.get_running_app()
@@ -306,9 +343,13 @@ class GameScreen(Screen):
             self.flash_error(error_text)
         else:
             app.user_number = int(entered_number)
-            self.flash_success(f"Число {entered_number} принято!")
-            self.text_number_input.text = ""
-        
+            compare_text, win_flag = is_winner(app.hidden_number, app.user_number)
+            if win_flag:
+                self.to_confirm_the_win()
+            else:
+                self.flash_success(compare_text)
+                self.text_number_input.text = ""
+
     def flash_error(self, message):
         original_text = self.range_label.text
         original_color = self.range_label.color
@@ -316,7 +357,6 @@ class GameScreen(Screen):
         self.range_label.text = message
         self.range_label.color = (1, 0, 0, 1)
         
-        from kivy.clock import Clock
         for i in range(3):
             Clock.schedule_once(lambda dt, i=i: self.toggle_error_color(i % 2 == 0), i * 0.3)
 
@@ -333,9 +373,8 @@ class GameScreen(Screen):
         original_color = self.range_label.color
         
         self.range_label.text = message
-        self.range_label.color = (0, 0.6, 0, 1)
+        self.range_label.color = (1, 1, 1, 1)
         
-        from kivy.clock import Clock
         Clock.schedule_once(lambda dt: self.restore_range_appearance(original_text, original_color), 1.5)
         
     def restore_range_appearance(self, text, color):
@@ -381,7 +420,7 @@ class RecordsScreen(Screen):
         buttons_records_layout.add_widget(text_label)
         buttons_records_layout.add_widget(btn_back)
         self.add_widget(buttons_records_layout)
-    
+
     def go_back_to_menu(self, instance):
         self.manager.current = 'menu'
 
