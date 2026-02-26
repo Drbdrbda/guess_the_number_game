@@ -8,8 +8,8 @@ from kivy.uix.popup import Popup
 from kivy.uix.floatlayout import FloatLayout
 from kivy.clock import Clock
 from time import *
-from read_records import to_read_records
 from script_game2 import *
+from utils import get_resource_path, get_records_path
 
 class MenuScreen(Screen):
     def __init__(self, **kwargs):
@@ -109,12 +109,24 @@ class MenuScreen(Screen):
             pos_hint = {"center_x":0.5, "center_y":0.5},
             font_size = '18sp'
         )
-        btn_confirm_limits.bind(on_press=self.to_save_limits)
+        btn_confirm_limits.bind(on_press = self.to_save_limits)
+
+        btn_back = Button(
+            text='Назад в меню',
+            size_hint=(0.3, None),
+            height=50,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+            font_size='18sp',
+            background_color=(0.4, 0.4, 0.4, 1),
+            color=(1, 1, 1, 1)
+        )
+        btn_back.bind(on_press = self.go_back_to_menu_from_popup)
         
         main_limits_layout.add_widget(self.title)
         main_limits_layout.add_widget(self.text_min_limit_input)
         main_limits_layout.add_widget(self.text_max_limit_input)
         main_limits_layout.add_widget(btn_confirm_limits)
+        main_limits_layout.add_widget(btn_back)
         
         main_limits_layout.add_widget(buttons_limits_layout)
 
@@ -176,6 +188,10 @@ class MenuScreen(Screen):
 
         else:
             self.to_confirm_error(error_text)
+
+    def go_back_to_menu_from_popup(self, instance):
+        self.popup.dismiss()
+        self.manager.current = 'menu'
 
     def to_show_game(self, instance = None):
         self.manager.current = 'game'
@@ -297,6 +313,10 @@ class GameScreen(Screen):
         self.text_number_input.text = ""
         self.win_popup.dismiss()
         self.to_save_records()
+
+        app = App.get_running_app()
+        app.update_records_display()
+
         self.go_back_to_menu(instance)
 
     def to_confirm_the_win(self):
@@ -384,6 +404,7 @@ class GameScreen(Screen):
     def go_back_to_menu(self, instance):
         self.manager.current = 'menu'
 
+
 class RecordsScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -394,32 +415,52 @@ class RecordsScreen(Screen):
         )
 
         title = Label(
-            text='Таблица рекордов',
+            text='[b][size=24]ТАБЛИЦА РЕКОРДОВ[/size][/b]',
+            markup=True,
             font_size='24sp',
-            size_hint=(1, 0.2)
+            size_hint=(1, 0.2),
+            color=(1, 1, 1, 1)
         )
 
-        text_label = Label(
-            text = 'Текст появится здесь',
-            font_size = '16sp',
-            size_hint = (1, 0.6)
+        self.text_label = Label(
+            text='',
+            font_size='18sp',
+            size_hint=(1, 0.6),
+            halign='center',
+            valign='middle',
+            markup=True
         )
 
-        text_label.text = to_read_records()
+        self.update_records_text()
 
         btn_back = Button(
-            text = 'Назад в меню',
-            size_hint = (.3, None),
-            height = 50,
-            pos_hint = {"center_x":0.5, "center_y":0.5},
-            font_size = '18sp'
+            text='Назад в меню',
+            size_hint=(0.3, None),
+            height=50,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+            font_size='18sp',
+            background_color=(0.4, 0.4, 0.4, 1),
+            color=(1, 1, 1, 1)
         )
         btn_back.bind(on_press=self.go_back_to_menu)
         
         buttons_records_layout.add_widget(title)
-        buttons_records_layout.add_widget(text_label)
+        buttons_records_layout.add_widget(self.text_label)
         buttons_records_layout.add_widget(btn_back)
         self.add_widget(buttons_records_layout)
+
+    def update_records_text(self):
+        records_text = to_update_records(filename='records.txt', max_count=10)
+        
+        if records_text == 'Предыдущих результатов ещё нет':
+            self.text_label.text = 'Рекордов ещё нет'
+        else:
+            lines = records_text.split('\n')
+            formatted = ''
+            for line in lines:
+                if line.strip() and 'Предыдущие результаты' not in line:
+                    formatted += line + '\n\n'
+            self.text_label.text = formatted
 
     def go_back_to_menu(self, instance):
         self.manager.current = 'menu'
@@ -428,10 +469,22 @@ class Game_App(App):
     def build(self):
         self.title = 'Числовая угадайка'
         sm = ScreenManager()
-        sm.add_widget(MenuScreen(name='menu'))
-        sm.add_widget(GameScreen(name='game'))
-        sm.add_widget(RecordsScreen(name='records'))
+
+        menu_screen = MenuScreen(name='menu')
+        game_screen = GameScreen(name='game')
+        records_screen = RecordsScreen(name='records')
+        
+        self.records_screen = records_screen
+        
+        sm.add_widget(menu_screen)
+        sm.add_widget(game_screen)
+        sm.add_widget(records_screen)
+
         return sm
+    
+    def update_records_display(self):
+        if hasattr(self, 'records_screen'):
+            self.records_screen.update_records_text()
     
 if __name__ == '__main__':
     Game_App().run()

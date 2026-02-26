@@ -1,5 +1,6 @@
 from random import *
 from time import *
+from utils import get_resource_path, get_records_path
 
 def to_create_number(min_lim, max_lim):
     the_secret_number = randint(min_lim, max_lim)
@@ -47,29 +48,48 @@ def keep_track_of_time(start_time, end_time):
     return result_time
 
 def to_write_records(txt, filename = 'records.txt'):
-    with open(filename, 'a') as file:
+    file_path = get_resource_path(filename)
+
+    with open(file_path, 'a') as file:
         file.write(f'{str(txt)}\n')
 
 def to_update_records(filename = 'records.txt', max_count = 10):
+    file_path = get_resource_path(filename)
+
+    result = 'Предыдущих результатов ещё нет'
     records_list = []
-    with open(filename, 'r') as file:
+
+    with open(file_path, 'r') as file:
         for line in file:
+            line = line.strip()
             if line not in records_list and len(records_list) <= max_count:
-                records_list.append(float(line))
+                try:
+                    records_list.append(float(line))
+                except ValueError:
+                    print(f"Предупреждение: некорректное значение в файле: {line}")
+                    continue
 
     records_list = sorted(records_list)
 
     if len(records_list) > max_count:
         records_list = records_list[:max_count]
 
-    with open(filename, 'w') as file:
+    with open(file_path, 'w') as file:
         for record in range(len(records_list)):
             file.write(str(records_list[record]) + '\n')
 
     if len(records_list) == 0:
-        print('Предыдущих результатов ещё нет')
+        return result
     else:
-        print('Предыдущие результаты:')
+        result = 'Предыдущие результаты:\n'
         for i, records_list in enumerate(records_list, start=1):
-            print(f'{i}. {records_list} секунд')
+            result += f'\n{i}. {records_list} секунд'
 
+    return result
+
+def to_read_records(filename = 'records.txt'):
+    file_path = get_resource_path(filename)
+
+    with open(file_path, 'r') as file:
+        cnt = file.read()
+    return cnt
